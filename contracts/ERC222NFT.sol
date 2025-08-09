@@ -57,7 +57,7 @@ contract ERC222NFT is ERC721A, Ownable, IERC2981, ReentrancyGuard {
         require(maxSupply_ > 0, "Max supply must be greater than 0");
         require(bytes(songName_).length > 0, "Song name cannot be empty");
         require(royaltyReceiver_ != address(0), "Invalid royalty receiver");
-        require(royaltyFeeNumerator_ <= 10000, "Royalty fee too high");
+        require(royaltyFeeNumerator_ <= 1000, "Royalty fee too high");
 
         MAX_SUPPLY = maxSupply_;
         songName = songName_;
@@ -144,7 +144,7 @@ contract ERC222NFT is ERC721A, Ownable, IERC2981, ReentrancyGuard {
      */
     function setRoyalty(address receiver, uint96 feeNumerator) external onlyOwner {
         require(receiver != address(0), "Invalid receiver");
-        require(feeNumerator <= 10000, "Royalty fee too high");
+        require(feeNumerator <= 1000, "Royalty fee too high");
 
         royaltyReceiver = receiver;
         royaltyFeeNumerator = feeNumerator;

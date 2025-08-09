@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 
 interface IERC222NFT {
@@ -42,14 +43,20 @@ interface IKANDI is IERC20 {
  * - platformFeeRate_ - Platform fee rate in basis points (e.g., 250 = 2.5%)
  */
 contract MintRouter is Ownable, ReentrancyGuard {
+    using SafeERC20 for IERC20;
+
     // Payment tokens
     IERC20 public immutable ghoToken;
     IKANDI public immutable kandiToken;
     
     // Fee configuration
     address public devWallet;
-    address public kandiPool;
+    address public kandiPool; // acts as KANDI treasury
     uint256 public platformFeeRate; // Basis points (10000 = 100%)
+    uint256 public feeTreasuryShareBps; // share of platform fee to treasury (0-10000)
+
+    uint256 public constant MIN_MINT_PRICE = 0.40 ether;
+    uint256 public constant MAX_FEE_BPS = 1000; // 10%
     
     // Song release configurations
     struct SongRelease {
@@ -89,6 +96,7 @@ contract MintRouter is Ownable, ReentrancyGuard {
     event DevWalletUpdated(address indexed oldWallet, address indexed newWallet);
     event KandiPoolUpdated(address indexed oldPool, address indexed newPool);
     event PlatformFeeRateUpdated(uint256 oldRate, uint256 newRate);
+    event FeeSplitUpdated(uint256 newTreasuryShareBps);
     event VaultPreloaded(string indexed songName, uint256 nftCount, uint256 tokenAmount);
 
     constructor(
@@ -102,13 +110,14 @@ contract MintRouter is Ownable, ReentrancyGuard {
         require(kandiToken_ != address(0), "Invalid KANDI token address");
         require(devWallet_ != address(0), "Invalid dev wallet address");
         require(kandiPool_ != address(0), "Invalid KANDI pool address");
-        require(platformFeeRate_ <= 10000, "Platform fee rate too high");
+        require(platformFeeRate_ <= MAX_FEE_BPS, "Platform fee rate too high");
 
         ghoToken = IERC20(ghoToken_);
         kandiToken = IKANDI(kandiToken_);
         devWallet = devWallet_;
         kandiPool = kandiPool_;
         platformFeeRate = platformFeeRate_;
+        feeTreasuryShareBps = 5000; // default 50/50
     }
 
     /**
@@ -132,7 +141,7 @@ contract MintRouter is Ownable, ReentrancyGuard {
         require(nftContract != address(0), "Invalid NFT contract");
         require(tokenContract != address(0), "Invalid token contract");
         require(vaultContract != address(0), "Invalid vault contract");
-        require(mintPrice > 0, "Mint price must be greater than 0");
+        require(mintPrice >= MIN_MINT_PRICE, "Mint price below minimum");
         require(maxMintsPerTx > 0, "Max mints per tx must be greater than 0");
         require(!songReleases[songName].exists, "Song release already exists");
 
@@ -181,7 +190,7 @@ contract MintRouter is Ownable, ReentrancyGuard {
         require(kandiToken.balanceOf(msg.sender) >= maxKandiAmount, "Insufficient KANDI balance");
         
         // Transfer KANDI from user and swap to GHO
-        require(kandiToken.transferFrom(msg.sender, address(this), maxKandiAmount), "KANDI transfer failed");
+        IERC20(address(kandiToken)).safeTransferFrom(msg.sender, address(this), maxKandiAmount);
         uint256 ghoReceived = kandiToken.swapToGHO(maxKandiAmount);
         require(ghoReceived >= totalCostGHO, "Insufficient GHO received from KANDI swap");
 
@@ -210,7 +219,7 @@ contract MintRouter is Ownable, ReentrancyGuard {
         uint256 totalCost = release.mintPrice * quantity;
         
         // Transfer payment from user
-        require(ghoToken.transferFrom(msg.sender, address(this), totalCost), "Payment transfer failed");
+        ghoToken.safeTransferFrom(msg.sender, address(this), totalCost);
         
         _executeMint(songName, quantity, totalCost, paymentToken);
     }
@@ -240,11 +249,12 @@ contract MintRouter is Ownable, ReentrancyGuard {
 
         // Distribute platform fee (50% to dev wallet, 50% to KANDI pool)
         if (platformFee > 0) {
-            uint256 devFee = platformFee / 2;
-            uint256 poolFee = platformFee - devFee;
+            uint256 treasuryFee = (platformFee * feeTreasuryShareBps) / 10000;
+            uint256 devFee = platformFee - treasuryFee;
             
-            require(ghoToken.transfer(devWallet, devFee), "Dev fee transfer failed");
-            require(ghoToken.transfer(kandiPool, poolFee), "Pool fee transfer failed");
+            require(devWallet != address(0) && kandiPool != address(0), "Fee recipients not set");
+            ghoToken.safeTransfer(devWallet, devFee);
+            ghoToken.safeTransfer(kandiPool, treasuryFee);
             
             emit PlatformFeeCollected(platformFee, address(ghoToken));
         }
@@ -299,7 +309,7 @@ contract MintRouter is Ownable, ReentrancyGuard {
      */
     function setMintPrice(string memory songName, uint256 newPrice) external onlyOwner {
         require(songReleases[songName].exists, "Song release does not exist");
-        require(newPrice > 0, "Price must be greater than 0");
+        require(newPrice >= MIN_MINT_PRICE, "Mint price below minimum");
 
         songReleases[songName].mintPrice = newPrice;
         emit MintPriceUpdated(songName, newPrice);
@@ -348,12 +358,18 @@ contract MintRouter is Ownable, ReentrancyGuard {
      * @param newRate New platform fee rate in basis points
      */
     function setPlatformFeeRate(uint256 newRate) external onlyOwner {
-        require(newRate <= 10000, "Platform fee rate too high");
+        require(newRate <= MAX_FEE_BPS, "Platform fee rate too high");
 
         uint256 oldRate = platformFeeRate;
         platformFeeRate = newRate;
 
         emit PlatformFeeRateUpdated(oldRate, newRate);
+    }
+
+    function setFeeSplitBps(uint256 newTreasuryShareBps) external onlyOwner {
+        require(newTreasuryShareBps <= 10000, "Invalid split bps");
+        feeTreasuryShareBps = newTreasuryShareBps;
+        emit FeeSplitUpdated(newTreasuryShareBps);
     }
 
     /**

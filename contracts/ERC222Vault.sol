@@ -4,6 +4,8 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
@@ -33,6 +35,7 @@ interface IERC222Token is IERC20 {
  * - admin_ - Admin address for management functions
  */
 contract ERC222Vault is Ownable, ReentrancyGuard, IERC721Receiver {
+    using SafeERC20 for IERC20;
     // Paired contracts
     IERC222NFT public immutable nftContract;
     IERC222Token public immutable tokenContract;
@@ -42,6 +45,8 @@ contract ERC222Vault is Ownable, ReentrancyGuard, IERC721Receiver {
     
     // Conversion ratio (from token contract)
     uint256 public immutable TOKENS_PER_NFT;
+    uint8 public immutable TOKEN_DECIMALS;
+    uint256 public immutable TOKENS_PER_NFT_UNITS;
     
     // Vault state
     mapping(uint256 => bool) public nftHeld; // Track which NFTs are in vault
@@ -95,6 +100,8 @@ contract ERC222Vault is Ownable, ReentrancyGuard, IERC721Receiver {
         
         // Get conversion ratio from token contract
         TOKENS_PER_NFT = tokenContract.TOKENS_PER_NFT();
+        TOKEN_DECIMALS = IERC20Metadata(tokenContract_).decimals();
+        TOKENS_PER_NFT_UNITS = TOKENS_PER_NFT * (10 ** TOKEN_DECIMALS);
     }
 
     /**
@@ -104,7 +111,7 @@ contract ERC222Vault is Ownable, ReentrancyGuard, IERC721Receiver {
     function depositNFT(uint256 tokenId) external nonReentrant swapIsEnabled {
         require(nftContract.ownerOf(tokenId) == msg.sender, "Not NFT owner");
         require(!nftHeld[tokenId], "NFT already in vault");
-        require(tokenBalance >= TOKENS_PER_NFT, "Insufficient tokens in vault");
+        require(tokenBalance >= TOKENS_PER_NFT_UNITS, "Insufficient tokens in vault");
 
         // Transfer NFT to vault
         nftContract.safeTransferFrom(msg.sender, address(this), tokenId);
@@ -112,12 +119,12 @@ contract ERC222Vault is Ownable, ReentrancyGuard, IERC721Receiver {
         // Update state
         nftHeld[tokenId] = true;
         nftCount++;
-        tokenBalance -= TOKENS_PER_NFT;
+        tokenBalance -= TOKENS_PER_NFT_UNITS;
         
         // Transfer kTokens to user
-        require(tokenContract.transfer(msg.sender, TOKENS_PER_NFT), "Token transfer failed");
+        IERC20(address(tokenContract)).safeTransfer(msg.sender, TOKENS_PER_NFT_UNITS);
         
-        emit NFTDepositedToVault(msg.sender, tokenId, TOKENS_PER_NFT);
+        emit NFTDepositedToVault(msg.sender, tokenId, TOKENS_PER_NFT_UNITS);
         emit FloorPriceUpdated(getFloorPrice());
     }
 
@@ -126,11 +133,11 @@ contract ERC222Vault is Ownable, ReentrancyGuard, IERC721Receiver {
      * @param tokenAmount Amount of kTokens to deposit (must be multiple of TOKENS_PER_NFT)
      */
     function depositTokens(uint256 tokenAmount) external nonReentrant swapIsEnabled {
-        require(tokenAmount >= TOKENS_PER_NFT, "Insufficient token amount");
-        require(tokenAmount % TOKENS_PER_NFT == 0, "Invalid token amount");
+        require(tokenAmount >= TOKENS_PER_NFT_UNITS, "Insufficient token amount");
+        require(tokenAmount % TOKENS_PER_NFT_UNITS == 0, "Invalid token amount");
         require(nftCount > 0, "No NFTs available in vault");
         
-        uint256 nftAmount = tokenAmount / TOKENS_PER_NFT;
+        uint256 nftAmount = tokenAmount / TOKENS_PER_NFT_UNITS;
         require(nftAmount <= nftCount, "Not enough NFTs in vault");
 
         // Transfer kTokens from user to vault
@@ -148,7 +155,7 @@ contract ERC222Vault is Ownable, ReentrancyGuard, IERC721Receiver {
                 nftCount--;
                 transferredNFTs++;
                 
-                emit TokensDepositedToVault(msg.sender, TOKENS_PER_NFT, i);
+                emit TokensDepositedToVault(msg.sender, TOKENS_PER_NFT_UNITS, i);
             }
         }
         
@@ -174,7 +181,7 @@ contract ERC222Vault is Ownable, ReentrancyGuard, IERC721Receiver {
         
         // Deposit tokens
         if (tokenAmount > 0) {
-            require(tokenContract.transferFrom(msg.sender, address(this), tokenAmount), "Token transfer failed");
+            IERC20(address(tokenContract)).safeTransferFrom(msg.sender, address(this), tokenAmount);
             tokenBalance += tokenAmount;
         }
         
@@ -195,7 +202,7 @@ contract ERC222Vault is Ownable, ReentrancyGuard, IERC721Receiver {
         if (openMarketMode) {
             // In open market mode, floor price is dynamic based on vault composition
             if (nftCount == 0) return 0;
-            return tokenBalance / nftCount / TOKENS_PER_NFT;
+            return tokenBalance / nftCount / TOKENS_PER_NFT_UNITS;
         } else {
             // During mint phase, use market cap calculation
             return totalMarketCap / totalNFTs;
@@ -314,7 +321,7 @@ contract ERC222Vault is Ownable, ReentrancyGuard, IERC721Receiver {
         require(amount <= tokenBalance, "Insufficient token balance");
         
         tokenBalance -= amount;
-        require(tokenContract.transfer(to, amount), "Token transfer failed");
+        IERC20(address(tokenContract)).safeTransfer(to, amount);
     }
 
     /**
@@ -361,7 +368,7 @@ contract ERC222Vault is Ownable, ReentrancyGuard, IERC721Receiver {
             songName,
             address(nftContract),
             address(tokenContract),
-            TOKENS_PER_NFT,
+            TOKENS_PER_NFT_UNITS,
             nftCount,
             tokenBalance,
             getFloorPrice(),

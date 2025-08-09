@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
  * @title KANDIToken
@@ -18,6 +19,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
  * - checkInContract_ - Address of daily check-in contract for rewards
  */
 contract KANDIToken is ERC20, Ownable, ReentrancyGuard {
+    using SafeERC20 for IERC20;
     // Total supply: 100 billion tokens
     uint256 public constant TOTAL_SUPPLY = 100_000_000_000 * 10**18;
     
@@ -43,6 +45,8 @@ contract KANDIToken is ERC20, Ownable, ReentrancyGuard {
     address public stakingContract;
     address public checkInContract;
     address public devWallet;
+    address public treasury;
+    uint256 public treasuryShareBps = 5000; // 50% of GHO routed to treasury
     
     // Distribution tracking
     struct VestingSchedule {
@@ -107,6 +111,7 @@ contract KANDIToken is ERC20, Ownable, ReentrancyGuard {
 
         ghoToken = IERC20(ghoToken_);
         devWallet = devWallet_;
+        treasury = devWallet_;
         stakingContract = stakingContract_;
         checkInContract = checkInContract_;
         swapFeeReceiver = devWallet_;
@@ -128,7 +133,14 @@ contract KANDIToken is ERC20, Ownable, ReentrancyGuard {
         require(openSaleDistributed + kandiAmount <= OPEN_SALE_AMOUNT, "Exceeds open sale allocation");
 
         // Transfer GHO from user
-        require(ghoToken.transferFrom(msg.sender, devWallet, ghoAmount), "GHO transfer failed");
+        // Pull GHO to this contract then split to treasury/dev
+        IERC20(ghoToken).safeTransferFrom(msg.sender, address(this), ghoAmount);
+
+        uint256 toTreasury = (ghoAmount * treasuryShareBps) / 10000;
+        uint256 toDev = ghoAmount - toTreasury;
+        require(treasury != address(0) && devWallet != address(0), "Fee recipients not set");
+        IERC20(ghoToken).safeTransfer(treasury, toTreasury);
+        IERC20(ghoToken).safeTransfer(devWallet, toDev);
 
         // Transfer KANDI to user
         require(transfer(msg.sender, kandiAmount), "KANDI transfer failed");
@@ -366,6 +378,25 @@ contract KANDIToken is ERC20, Ownable, ReentrancyGuard {
         require(newDevWallet != address(0), "Invalid dev wallet");
         devWallet = newDevWallet;
         emit ContractAddressUpdated("devwallet", newDevWallet);
+    }
+
+    /**
+     * @dev Set treasury address
+     * @param newTreasury New treasury address
+     */
+    function setTreasury(address newTreasury) external onlyOwner {
+        require(newTreasury != address(0), "Invalid treasury");
+        treasury = newTreasury;
+        emit ContractAddressUpdated("treasury", newTreasury);
+    }
+
+    /**
+     * @dev Set treasury share bps
+     * @param newShareBps New treasury share in basis points (max 10000)
+     */
+    function setTreasuryShareBps(uint256 newShareBps) external onlyOwner {
+        require(newShareBps <= 10000, "Invalid split bps");
+        treasuryShareBps = newShareBps;
     }
 
     /**
