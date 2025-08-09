@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /**
  * @title ERC222Token
@@ -12,11 +12,11 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
  * @dev No burning logic - tokens are always transferred, not destroyed
  * 
  * Constructor Parameters:
- * @param name_ - Name of the kToken (e.g., "kHades")
- * @param symbol_ - Symbol of the kToken (e.g., "KHADES")
- * @param songName_ - Name of the song this token represents
- * @param totalSupply_ - Total supply of kTokens (typically 100B for 10M NFTs)
- * @param nftContract_ - Address of the paired NFT contract
+ * - name_ - Name of the kToken (e.g., "kHades")
+ * - symbol_ - Symbol of the kToken (e.g., "KHADES")
+ * - songName_ - Name of the song this token represents
+ * - totalSupply_ - Total supply of kTokens (typically 100B for 10M NFTs)
+ * - nftContract_ - Address of the paired NFT contract
  */
 contract ERC222Token is ERC20, Ownable, ReentrancyGuard {
     // Conversion ratio: 1 NFT = 10,000 kTokens
@@ -166,18 +166,17 @@ contract ERC222Token is ERC20, Ownable, ReentrancyGuard {
     }
 
     /**
-     * @dev Override transfer to emit events when transferring to vault
+     * @dev Hook to emit events when transferring to vault (OpenZeppelin v5)
      */
-    function _beforeTokenTransfer(
+    function _update(
         address from,
         address to,
-        uint256 amount
+        uint256 value
     ) internal virtual override {
-        super._beforeTokenTransfer(from, to, amount);
-        
-        // If transferring to vault contract, emit deposit event
+        super._update(from, to, value);
+
         if (to == vaultContract && vaultContract != address(0) && from != address(0)) {
-            emit TokensDepositedToVault(from, amount);
+            emit TokensDepositedToVault(from, value);
         }
     }
 

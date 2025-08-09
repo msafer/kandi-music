@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 
@@ -35,11 +35,11 @@ interface IKANDI is IERC20 {
  * @dev Manages platform fees and vault preloading
  * 
  * Constructor Parameters:
- * @param ghoToken_ - Address of GHO stablecoin contract
- * @param kandiToken_ - Address of KANDI platform token contract
- * @param devWallet_ - Address to receive platform fees
- * @param kandiPool_ - Address of KANDI liquidity pool for fee routing
- * @param platformFeeRate_ - Platform fee rate in basis points (e.g., 250 = 2.5%)
+ * - ghoToken_ - Address of GHO stablecoin contract
+ * - kandiToken_ - Address of KANDI platform token contract
+ * - devWallet_ - Address to receive platform fees
+ * - kandiPool_ - Address of KANDI liquidity pool for fee routing
+ * - platformFeeRate_ - Platform fee rate in basis points (e.g., 250 = 2.5%)
  */
 contract MintRouter is Ownable, ReentrancyGuard {
     // Payment tokens

@@ -1,0 +1,29 @@
+{
+  "name": "workspace",
+  "version": "1.0.0",
+  "description": "A Web3 music NFT marketplace using a custom token standard that pairs ERC-721 NFTs with mirrored ERC-20 \"kTokens\" for revolutionary music rights fractionalization.",
+  "main": "index.js",
+  "scripts": {
+    "test": "hardhat test",
+    "compile": "hardhat compile"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/msafer/kandi-music.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/msafer/kandi-music/issues"
+  },
+  "homepage": "https://github.com/msafer/kandi-music#readme",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^6.1.0",
+    "hardhat": "^2.26.2"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.4.0",
+    "erc721a": "^4.3.0"
+  }
+}

@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
@@ -27,10 +27,10 @@ interface IERC222Token is IERC20 {
  * @dev Enters "open market" mode after all NFTs are minted
  * 
  * Constructor Parameters:
- * @param nftContract_ - Address of the paired ERC222NFT contract
- * @param tokenContract_ - Address of the paired ERC222Token contract
- * @param songName_ - Name of the song this vault represents
- * @param admin_ - Admin address for management functions
+ * - nftContract_ - Address of the paired ERC222NFT contract
+ * - tokenContract_ - Address of the paired ERC222Token contract
+ * - songName_ - Name of the song this vault represents
+ * - admin_ - Admin address for management functions
  */
 contract ERC222Vault is Ownable, ReentrancyGuard, IERC721Receiver {
     // Paired contracts

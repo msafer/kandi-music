@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /**
@@ -12,10 +12,10 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
  * @dev Handles distribution, vesting, staking rewards, and GHO swapping
  * 
  * Constructor Parameters:
- * @param ghoToken_ - Address of GHO stablecoin for swapping
- * @param devWallet_ - Address for team/development allocation
- * @param stakingContract_ - Address of staking contract for rewards
- * @param checkInContract_ - Address of daily check-in contract for rewards
+ * - ghoToken_ - Address of GHO stablecoin for swapping
+ * - devWallet_ - Address for team/development allocation
+ * - stakingContract_ - Address of staking contract for rewards
+ * - checkInContract_ - Address of daily check-in contract for rewards
  */
 contract KANDIToken is ERC20, Ownable, ReentrancyGuard {
     // Total supply: 100 billion tokens

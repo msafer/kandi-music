@@ -4,8 +4,8 @@ pragma solidity ^0.8.20;
 import "erc721a/contracts/ERC721A.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/interfaces/IERC2981.sol";
-import "@openzeppelin/contracts/utils/introspection/ERC165.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /**
  * @title ERC222NFT
@@ -13,13 +13,13 @@ import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
  * @dev Supports EIP-2981 royalties and integrates with ERC222Vault
  * 
  * Constructor Parameters:
- * @param name_ - Name of the NFT collection (e.g., "Hades Music NFT")
- * @param symbol_ - Symbol of the NFT collection (e.g., "HADES")
- * @param songName_ - Name of the song for this release
- * @param maxSupply_ - Maximum number of NFTs that can be minted (typically 10M)
- * @param baseURI_ - Base URI for token metadata
- * @param royaltyReceiver_ - Address to receive royalty payments
- * @param royaltyFeeNumerator_ - Royalty fee in basis points (e.g., 250 = 2.5%)
+ * - name_ - Name of the NFT collection (e.g., "Hades Music NFT")
+ * - symbol_ - Symbol of the NFT collection (e.g., "HADES")
+ * - songName_ - Name of the song for this release
+ * - maxSupply_ - Maximum number of NFTs that can be minted (typically 10M)
+ * - baseURI_ - Base URI for token metadata
+ * - royaltyReceiver_ - Address to receive royalty payments
+ * - royaltyFeeNumerator_ - Royalty fee in basis points (e.g., 250 = 2.5%)
  */
 contract ERC222NFT is ERC721A, Ownable, IERC2981, ReentrancyGuard {
     // Maximum supply of NFTs for this song
@@ -119,7 +119,7 @@ contract ERC222NFT is ERC721A, Ownable, IERC2981, ReentrancyGuard {
         require(ownerOf(tokenId) == msg.sender, "Not token owner");
 
         // Transfer NFT to vault
-        _transfer(msg.sender, vaultContract, tokenId);
+        safeTransferFrom(msg.sender, vaultContract, tokenId);
         
         emit NFTDepositedToVault(msg.sender, tokenId);
     }
